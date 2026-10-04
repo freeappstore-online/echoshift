@@ -2331,21 +2331,41 @@
     /* --------------------------------------------------------------------------
        Source 1: Spoken Voice Demo (Real Spoken Human Words)
        -------------------------------------------------------------------------- */
+    /* Helper to convert base64 data URI to ArrayBuffer without network fetch */
+    function base64ToArrayBuffer(base64) {
+      const binaryString = window.atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    /* --------------------------------------------------------------------------
+       Source 1: Spoken Voice Demo (Real Spoken Human Words)
+       -------------------------------------------------------------------------- */
     async function loadSpokenBuffer(voiceKey) {
       const ctx = ensureAudioContext();
       if (!ctx) return null;
 
-      // Try window.SPEECH_SAMPLES data URI first, then static asset
-      let audioSrc = '';
-      if (window.SPEECH_SAMPLES && window.SPEECH_SAMPLES[voiceKey]) {
-        audioSrc = window.SPEECH_SAMPLES[voiceKey];
-      } else {
-        audioSrc = `/assets/sample_${voiceKey}.mp3`;
-      }
-
       try {
-        const res = await fetch(audioSrc);
-        const arrayBuf = await res.arrayBuffer();
+        let arrayBuf;
+
+        if (window.SPEECH_SAMPLES && window.SPEECH_SAMPLES[voiceKey]) {
+          const sample = window.SPEECH_SAMPLES[voiceKey];
+          if (sample.startsWith('data:')) {
+            const base64Data = sample.split(',')[1];
+            arrayBuf = base64ToArrayBuffer(base64Data);
+          } else {
+            const res = await fetch(sample);
+            arrayBuf = await res.arrayBuffer();
+          }
+        } else {
+          const res = await fetch(`./assets/sample_${voiceKey}.mp3`);
+          arrayBuf = await res.arrayBuffer();
+        }
+
         const audioBuf = await ctx.decodeAudioData(arrayBuf);
         state.demoAudioBuffer = audioBuf;
         state.demoLoadedVoice = voiceKey;
