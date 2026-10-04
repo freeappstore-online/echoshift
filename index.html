@@ -2507,50 +2507,27 @@
       activateVirtualLiveMic(ctx);
     }
 
-    async function activateVirtualLiveMic(ctx) {
-      if (!state.demoAudioBuffer) {
-        await loadSpokenBuffer(UI.demoVoiceSelect ? UI.demoVoiceSelect.value : 'female');
+  async function toggleMicrophone() {
+      const ctx = ensureAudioContext();
+      if (!ctx) return;
+
+      if (state.micStream) {
+        stopMicrophone();
+        return;
       }
-      if (!state.demoAudioBuffer) return;
 
-      const source = ctx.createBufferSource();
-      source.buffer = state.demoAudioBuffer;
-      source.loop = true;
-      source.playbackRate.value = (state.activePreset === 'chipmunk') ? 1.6 : (state.activePreset === 'deep' ? 0.9 : 1.15);
-      source.connect(state.inputGainNode);
-      source.start(0);
+      stopSpokenDemo();
+      stopQuickVoiceLoop();
+      stopUploadedAudio();
 
-      state.virtualMicSource = source;
-      state.isVirtualMicActive = true;
-      setVolumeQuick(75);
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showNotice('Microphone API (getUserMedia) is not supported in this browser.', 'warning');
+        return;
+      }
 
-      setEngineStatus('active', 'Voice Stream Live');
-      UI.btnMic.classList.remove('btn-primary');
-      UI.btnMic.classList.add('btn-warning');
-      UI.btnMicLabel.textContent = 'Stop Microphone';
-      UI.btnRecord.disabled = false;
-    }
       try {
-        let stream = null;
-
-        // Try getting stream with bare minimum audio constraint
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (initialErr) {
-          // Fallback: enumerate devices and select the first available audioinput deviceId
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const audioInputs = devices.filter(d => d.kind === 'audioinput');
-
-          if (audioInputs.length > 0) {
-            const firstDeviceId = audioInputs[0].deviceId;
-            stream = await navigator.mediaDevices.getUserMedia({
-              audio: { deviceId: { exact: firstDeviceId } }
-            });
-          } else {
-            throw initialErr;
-          }
-        }
-
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
         state.micStream = stream;
         state.micSourceNode = ctx.createMediaStreamSource(stream);
         state.micSourceNode.connect(state.inputGainNode);
@@ -2561,32 +2538,20 @@
         UI.btnMicLabel.textContent = 'Mute Microphone';
         UI.btnRecord.disabled = false;
 
-        showNotice('Microphone connected! Speak into your mic. Click "Hear Myself" to monitor your voice live.', 'success');
+        showNotice('Microphone connected! Speak into your mic. Click "Hear Myself" to monitor live.', 'success');
       } catch (err) {
-        console.error('Mic access error:', err);
-        showNotice(`Microphone access failed (${err.name}). Check browser permissions or test on localhost without service workers.`, 'warning');
+        console.warn('Physical mic access error:', err);
+        if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          showNotice('No microphone detected by your browser. Please check Windows sound input settings.', 'warning');
+        } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          showNotice('Microphone permission blocked. Please allow mic access in your browser address bar.', 'warning');
+        } else {
+          showNotice(`Microphone error: ${err.message || err.name}`, 'warning');
+        }
       }
-    
+    }
 
-      try {
-        state.micStream = stream;
-        state.micSourceNode = ctx.createMediaStreamSource(stream);
-        state.micSourceNode.connect(state.inputGainNode);
-
-        setEngineStatus('active', 'Microphone Live');
-        UI.btnMic.classList.remove('btn-primary');
-        UI.btnMic.classList.add('btn-warning');
-        UI.btnMicLabel.textContent = 'Mute Microphone';
-        UI.btnRecord.disabled = false;
-
-        showNotice('Microphone connected! Click "Hear Myself" to monitor through headphones.', 'success');
-      } catch (graphErr) {
-        console.error('Audio graph connection error:', graphErr);
-        showNotice('Failed to connect microphone to Web Audio graph.', 'warning');
-      }
-    
-
-    function stopMicrophone() {
+      function stopMicrophone() {
       if (state.micStream) {
         state.micStream.getTracks().forEach(track => track.stop());
         state.micStream = null;
@@ -2595,11 +2560,6 @@
         try { state.micSourceNode.disconnect(); } catch (e) {}
         state.micSourceNode = null;
       }
-      if (state.virtualMicSource) {
-        try { state.virtualMicSource.stop(); state.virtualMicSource.disconnect(); } catch (e) {}
-        state.virtualMicSource = null;
-      }
-      state.isVirtualMicActive = false;
 
       UI.btnMic.classList.add('btn-primary');
       UI.btnMic.classList.remove('btn-warning');
@@ -2627,7 +2587,7 @@
     /* --------------------------------------------------------------------------
        Source 3: Quick 3-Second Voice Test Loop
        -------------------------------------------------------------------------- */
-    async function startQuickVoiceRecord() {
+   async function startQuickVoiceRecord() {
       const ctx = ensureAudioContext();
       if (!ctx) return;
 
@@ -2637,68 +2597,75 @@
 
       let stream = state.micStream;
 
-      // If no hardware mic is active, check if getUserMedia is permitted
       if (!stream) {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           state.micStream = stream;
         } catch (e) {
           console.warn('Physical mic unavailable for quick record:', e);
-        }
-      }
-
-      // If hardware mic is blocked, record from the active audio graph output
-      if (!stream) {
-        if (state.recordDestNode && state.recordDestNode.stream) {
-          stream = state.recordDestNode.stream;
-        } else {
-          showNotice('Microphone access unavailable. Switch to the Spoken Voice Demo tab to test presets.', 'warning');
+          showNotice('Microphone required for 3s quick test. Please connect an input device.', 'warning');
           return;
         }
       }
 
-      state.quickLoopChunks = [];
-      const mr = new MediaRecorder(stream);
-      state.quickLoopRecorder = mr;
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4');
 
-      mr.ondataavailable = e => {
-        if (e.data.size > 0) state.quickLoopChunks.push(e.data);
+      let mediaRecorder;
+      try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+      } catch (e) {
+        mediaRecorder = new MediaRecorder(stream);
+      }
+
+      const recordedChunks = [];
+      mediaRecorder.ondataavailable = e => {
+        if (e.data && e.data.size > 0) recordedChunks.push(e.data);
       };
 
-      mr.onstop = async () => {
-        const blob = new Blob(state.quickLoopChunks, { type: 'audio/webm' });
-        const arrayBuf = await blob.arrayBuffer();
-        try {
-          state.quickLoopBuffer = await ctx.decodeAudioData(arrayBuf);
-          playQuickVoiceLoop();
-        } catch (err) {
-          console.error('Failed to decode recorded quick loop:', err);
-        }
-      };
-
-      mr.start();
+      let countdown = 3;
       UI.btnQuickRecord.disabled = true;
-      UI.btnQuickRecordLabel.textContent = 'Recording (3s)... Speak now!';
-      UI.quickLoopProgress.style.display = 'block';
-      UI.quickLoopProgressFill.style.width = '0%';
+      UI.btnQuickRecord.textContent = `Recording... ${countdown}s`;
 
-      let elapsed = 0;
-      const step = 50;
-      const interval = setInterval(() => {
-        elapsed += step;
-        const pct = Math.min(100, (elapsed / 3000) * 100);
-        UI.quickLoopProgressFill.style.width = pct + '%';
-
-        if (elapsed >= 3000) {
-          clearInterval(interval);
-          mr.stop();
-          UI.btnQuickRecord.disabled = false;
-          UI.btnQuickRecordLabel.textContent = 'Record 3s Test Phrase';
-          UI.quickLoopProgress.style.display = 'none';
+      const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          UI.btnQuickRecord.textContent = `Recording... ${countdown}s`;
+        } else {
+          clearInterval(countdownInterval);
         }
-      }, step);
-    }
+      }, 1000);
 
+      mediaRecorder.onstop = async () => {
+        UI.btnQuickRecord.disabled = false;
+        UI.btnQuickRecord.textContent = 'Record 3s Test Phrase';
+
+        if (recordedChunks.length === 0) {
+          showNotice('No audio data was recorded.', 'warning');
+          return;
+        }
+
+        const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        try {
+          const arrayBuffer = await blob.arrayBuffer();
+          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          state.quickLoopBuffer = audioBuffer;
+          showNotice('3s sample recorded! Now looping continuously. Click any voice preset to audition.', 'success');
+          playQuickVoiceLoop();
+        } catch (decodeErr) {
+          console.error('Failed to decode recorded quick loop:', decodeErr);
+          showNotice('Failed to process recorded audio. Please try again.', 'warning');
+        }
+      };
+
+      mediaRecorder.start();
+      setTimeout(() => {
+        if (mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+        }
+      }, 3000);
+    }
     function playQuickVoiceLoop() {
       const ctx = ensureAudioContext();
       if (!ctx || !state.quickLoopBuffer) return;
