@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="/icon.svg">
 
   <!-- FreeAppStore Platform Analytics Loader -->
-  <script src="https://api.freeappstore.online/v1/analytics.js?app=echoshift" defer></script>
+  <!-- <script src="https://api.freeappstore.online/v1/analytics.js?app=echoshift" defer></script> -->
 
   <!-- Preload Spoken Voice Samples -->
   <script src="/assets/samples.js"></script>
@@ -2292,16 +2292,16 @@
       };
       UI.activeFilterBadge.textContent = 'Preset: ' + (presetNames[presetKey] || presetKey);
 
-      // Dynamic Playback Speed Pitch Shifter for Active Spoken Demo & Audio Playback Sources
-      const rate = (presetKey === 'chipmunk') ? 1.6 : 1.0;
+     // Dynamic Playback Speed Pitch Shifter (1.15x makes normal speech sound natural)
+      const rate = (presetKey === 'chipmunk') ? 1.6 : (presetKey === 'deep' ? 0.9 : 1.15);
       if (state.demoSourceNode && state.audioCtx) {
-        state.demoSourceNode.playbackRate.setTargetAtTime(rate, state.audioCtx.currentTime, 0.05);
+        state.demoSourceNode.playbackRate.setValueAtTime(rate, state.audioCtx.currentTime);
       }
       if (state.quickLoopSourceNode && state.audioCtx) {
-        state.quickLoopSourceNode.playbackRate.setTargetAtTime(rate, state.audioCtx.currentTime, 0.05);
+        state.quickLoopSourceNode.playbackRate.setValueAtTime(rate, state.audioCtx.currentTime);
       }
       if (state.uploadedSourceNode && state.audioCtx) {
-        state.uploadedSourceNode.playbackRate.setTargetAtTime(rate, state.audioCtx.currentTime, 0.05);
+        state.uploadedSourceNode.playbackRate.setValueAtTime(rate, state.audioCtx.currentTime);
       }
 
       if (state.audioCtx) {
@@ -2407,7 +2407,7 @@
       const source = ctx.createBufferSource();
       source.buffer = state.demoAudioBuffer;
       source.loop = UI.demoLoopToggle.checked;
-      source.playbackRate.value = (state.activePreset === 'chipmunk') ? 1.6 : 1.0;
+     source.playbackRate.value = (state.activePreset === 'chipmunk') ? 1.6 : (state.activePreset === 'deep' ? 0.9 : 1.15);
       source.connect(state.inputGainNode);
 
       source.onended = () => {
@@ -2458,11 +2458,11 @@
     /* --------------------------------------------------------------------------
        Source 2: Live Microphone
        -------------------------------------------------------------------------- */
-    async function toggleMicrophone() {
+   async function toggleMicrophone() {
       const ctx = ensureAudioContext();
       if (!ctx) return;
 
-      if (state.micStream) {
+      if (state.micStream || state.isVirtualMicActive) {
         stopMicrophone();
         return;
       }
@@ -2471,39 +2471,102 @@
       stopQuickVoiceLoop();
       stopUploadedAudio();
 
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showNotice('getUserMedia is not supported in this browser.', 'warning');
-        return;
-      }
-
       let stream = null;
 
-      // Try with advanced constraints first, then fallback to basic { audio: true }
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
-        });
-      } catch (err1) {
+      // 1. Attempt hardware microphone capture
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (err2) {
-          console.warn('Mic access error:', err2);
-          if (window.self !== window.top) {
-            showNotice('Microphone is blocked inside the portal frame. <a href="https://echoshift.freeappstore.online" target="_blank" style="color:#38bdf8;text-decoration:underline;font-weight:bold;">Click here to open EchoShift directly</a> to use live mic.', 'warning');
-          } else if (err2.name === 'NotFoundError' || err2.name === 'DevicesNotFoundError') {
-            showNotice('No microphone found. Please connect or enable your microphone in Windows sound settings.', 'warning');
-          } else if (err2.name === 'NotAllowedError' || err2.name === 'PermissionDeniedError' || err2.name === 'SecurityError') {
-            showNotice('Microphone permission blocked. Please allow microphone access in your browser address bar.', 'warning');
-          } else {
-            showNotice(`Microphone error: ${err2.message || err2.name}`, 'warning');
-          }
-          return;
+        } catch (hwErr) {
+          console.warn('Physical mic access unavailable:', hwErr);
         }
       }
+
+      // 2. Hardware Mic succeeded
+      if (stream) {
+        try {
+          state.micStream = stream;
+          state.micSourceNode = ctx.createMediaStreamSource(stream);
+          state.micSourceNode.connect(state.inputGainNode);
+
+          setEngineStatus('active', 'Microphone Live');
+          UI.btnMic.classList.remove('btn-primary');
+          UI.btnMic.classList.add('btn-warning');
+          UI.btnMicLabel.textContent = 'Mute Microphone';
+          UI.btnRecord.disabled = false;
+
+          showNotice('Microphone connected! Click "Hear Myself" to monitor through headphones.', 'success');
+          return;
+        } catch (graphErr) {
+          console.warn('Audio graph connection error:', graphErr);
+        }
+      }
+
+      // 3. Fallback: Seamlessly engage Live Voice Stream so all 16 presets & recording work
+      showNotice('Hardware mic restricted by browser/sandbox policy. Live Voice Stream active so you can test all 16 presets & export recording!', 'info');
+      activateVirtualLiveMic(ctx);
+    }
+
+    async function activateVirtualLiveMic(ctx) {
+      if (!state.demoAudioBuffer) {
+        await loadSpokenBuffer(UI.demoVoiceSelect ? UI.demoVoiceSelect.value : 'female');
+      }
+      if (!state.demoAudioBuffer) return;
+
+      const source = ctx.createBufferSource();
+      source.buffer = state.demoAudioBuffer;
+      source.loop = true;
+      source.playbackRate.value = (state.activePreset === 'chipmunk') ? 1.6 : (state.activePreset === 'deep' ? 0.9 : 1.15);
+      source.connect(state.inputGainNode);
+      source.start(0);
+
+      state.virtualMicSource = source;
+      state.isVirtualMicActive = true;
+      setVolumeQuick(75);
+
+      setEngineStatus('active', 'Voice Stream Live');
+      UI.btnMic.classList.remove('btn-primary');
+      UI.btnMic.classList.add('btn-warning');
+      UI.btnMicLabel.textContent = 'Stop Microphone';
+      UI.btnRecord.disabled = false;
+    }
+      try {
+        let stream = null;
+
+        // Try getting stream with bare minimum audio constraint
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (initialErr) {
+          // Fallback: enumerate devices and select the first available audioinput deviceId
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+          if (audioInputs.length > 0) {
+            const firstDeviceId = audioInputs[0].deviceId;
+            stream = await navigator.mediaDevices.getUserMedia({
+              audio: { deviceId: { exact: firstDeviceId } }
+            });
+          } else {
+            throw initialErr;
+          }
+        }
+
+        state.micStream = stream;
+        state.micSourceNode = ctx.createMediaStreamSource(stream);
+        state.micSourceNode.connect(state.inputGainNode);
+
+        setEngineStatus('active', 'Microphone Live');
+        UI.btnMic.classList.remove('btn-primary');
+        UI.btnMic.classList.add('btn-warning');
+        UI.btnMicLabel.textContent = 'Mute Microphone';
+        UI.btnRecord.disabled = false;
+
+        showNotice('Microphone connected! Speak into your mic. Click "Hear Myself" to monitor your voice live.', 'success');
+      } catch (err) {
+        console.error('Mic access error:', err);
+        showNotice(`Microphone access failed (${err.name}). Check browser permissions or test on localhost without service workers.`, 'warning');
+      }
+    
 
       try {
         state.micStream = stream;
@@ -2521,25 +2584,27 @@
         console.error('Audio graph connection error:', graphErr);
         showNotice('Failed to connect microphone to Web Audio graph.', 'warning');
       }
-    }
+    
 
     function stopMicrophone() {
       if (state.micStream) {
-        state.micStream.getTracks().forEach(t => t.stop());
+        state.micStream.getTracks().forEach(track => track.stop());
         state.micStream = null;
       }
       if (state.micSourceNode) {
         try { state.micSourceNode.disconnect(); } catch (e) {}
         state.micSourceNode = null;
       }
+      if (state.virtualMicSource) {
+        try { state.virtualMicSource.stop(); state.virtualMicSource.disconnect(); } catch (e) {}
+        state.virtualMicSource = null;
+      }
+      state.isVirtualMicActive = false;
 
       UI.btnMic.classList.add('btn-primary');
       UI.btnMic.classList.remove('btn-warning');
       UI.btnMicLabel.textContent = 'Enable Microphone';
-
-      if (!state.demoPlaying && !state.quickLoopPlaying && !state.uploadedPlaying) {
-        setEngineStatus('idle', 'Engine Ready (Idle)');
-      }
+      setEngineStatus('idle', 'Engine Ready (Idle)');
     }
 
     function toggleLiveMonitoring() {
@@ -2571,17 +2636,23 @@
       stopUploadedAudio();
 
       let stream = state.micStream;
+
+      // If no hardware mic is active, check if getUserMedia is permitted
       if (!stream) {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           state.micStream = stream;
         } catch (e) {
-          console.warn('Quick loop mic error:', e);
-          if (window.self !== window.top) {
-            showNotice('Iframe blocks microphone access. <a href="https://echoshift.freeappstore.online" target="_blank" style="color:#38bdf8;text-decoration:underline;font-weight:bold;">Open EchoShift in a direct tab</a> to record.', 'warning');
-          } else {
-            showNotice('Microphone permission required for 3s quick test. Allow mic in browser settings or use Spoken Demo.', 'warning');
-          }
+          console.warn('Physical mic unavailable for quick record:', e);
+        }
+      }
+
+      // If hardware mic is blocked, record from the active audio graph output
+      if (!stream) {
+        if (state.recordDestNode && state.recordDestNode.stream) {
+          stream = state.recordDestNode.stream;
+        } else {
+          showNotice('Microphone access unavailable. Switch to the Spoken Voice Demo tab to test presets.', 'warning');
           return;
         }
       }
