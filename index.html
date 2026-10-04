@@ -11,7 +11,7 @@
   <!-- PWA & Color Scheme Meta Tags for FreeAppStore -->
   <meta name="theme-color" content="#090d16">
   <meta name="color-scheme" content="light dark">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="EchoShift">
   <link rel="manifest" href="/manifest.json">
@@ -2471,37 +2471,55 @@
       stopQuickVoiceLoop();
       stopUploadedAudio();
 
-      try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('getUserMedia not supported in this browser context.');
-        }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showNotice('getUserMedia is not supported in this browser.', 'warning');
+        return;
+      }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
+      let stream = null;
+
+      // Try with advanced constraints first, then fallback to basic { audio: true }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true
-          },
-          video: false
+          }
         });
+      } catch (err1) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (err2) {
+          console.warn('Mic access error:', err2);
+          if (window.self !== window.top) {
+            showNotice('Microphone is blocked inside the portal frame. <a href="https://echoshift.freeappstore.online" target="_blank" style="color:#38bdf8;text-decoration:underline;font-weight:bold;">Click here to open EchoShift directly</a> to use live mic.', 'warning');
+          } else if (err2.name === 'NotFoundError' || err2.name === 'DevicesNotFoundError') {
+            showNotice('No microphone found. Please connect or enable your microphone in Windows sound settings.', 'warning');
+          } else if (err2.name === 'NotAllowedError' || err2.name === 'PermissionDeniedError' || err2.name === 'SecurityError') {
+            showNotice('Microphone permission blocked. Please allow microphone access in your browser address bar.', 'warning');
+          } else {
+            showNotice(`Microphone error: ${err2.message || err2.name}`, 'warning');
+          }
+          return;
+        }
+      }
 
+      try {
         state.micStream = stream;
         state.micSourceNode = ctx.createMediaStreamSource(stream);
         state.micSourceNode.connect(state.inputGainNode);
 
-        // Update UI
         setEngineStatus('active', 'Microphone Live');
         UI.btnMic.classList.remove('btn-primary');
         UI.btnMic.classList.add('btn-warning');
         UI.btnMicLabel.textContent = 'Mute Microphone';
         UI.btnRecord.disabled = false;
 
-        showNotice('Microphone connected! Speak into your mic. Click "Hear Myself" to monitor your voice live.', 'success');
-      } catch (err) {
-        console.warn('Mic access error:', err);
-        showNotice('Microphone access blocked or unavailable in this iframe. Switched to Spoken Voice Demo mode so you can test all voice effects immediately!', 'warning');
-        switchSourceTab('spoken');
-        toggleSpokenDemo();
+        showNotice('Microphone connected! Click "Hear Myself" to monitor through headphones.', 'success');
+      } catch (graphErr) {
+        console.error('Audio graph connection error:', graphErr);
+        showNotice('Failed to connect microphone to Web Audio graph.', 'warning');
       }
     }
 
@@ -2555,10 +2573,15 @@
       let stream = state.micStream;
       if (!stream) {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           state.micStream = stream;
         } catch (e) {
-          showNotice('Microphone permission required for 3s quick test. Use the Spoken Voice Demo tab instead!', 'warning');
+          console.warn('Quick loop mic error:', e);
+          if (window.self !== window.top) {
+            showNotice('Iframe blocks microphone access. <a href="https://echoshift.freeappstore.online" target="_blank" style="color:#38bdf8;text-decoration:underline;font-weight:bold;">Open EchoShift in a direct tab</a> to record.', 'warning');
+          } else {
+            showNotice('Microphone permission required for 3s quick test. Allow mic in browser settings or use Spoken Demo.', 'warning');
+          }
           return;
         }
       }
