@@ -970,8 +970,9 @@
             </label>
           </div>
 
-          <div class="spoken-action-row">
-            <button id="btnPlayDemo" class="btn btn-primary spoken-play-btn" onclick="toggleSpokenDemo()">
+          
+            <div class="spoken-action-row">
+            <button id="btnPlayDemo" class="btn btn-primary" onclick="toggleSpokenDemo()">
               <svg viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5 3 19 12 5 21 5 3"/>
               </svg>
@@ -986,7 +987,7 @@
         <!-- Panel 2: Live Microphone -->
         <div class="source-panel" id="panelMic">
           <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-            <button id="btnMic" class="btn btn-primary" onclick="toggleMicrophone()">
+           <button id="btnMic" class="btn btn-primary" onclick="toggleMicrophone()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -1013,7 +1014,7 @@
           <div style="font-size: 0.76rem; color: var(--text-muted);">
             Record a quick 3-second sample of your voice ("One, two, three!"). It will automatically loop continuously so you can test all filter presets without needing headphones!
           </div>
-          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <button id="btnQuickRecord" class="btn btn-danger" onclick="startQuickVoiceRecord()">
               <svg viewBox="0 0 24 24" fill="currentColor">
                 <circle cx="12" cy="12" r="8"/>
@@ -1387,7 +1388,6 @@
     </footer>
   </div>
 
-  <!-- Inline Audio DSP Script -->
   <script>
     /* ==========================================================================
        EchoShift Web Audio Core Engine & State Management
@@ -2459,55 +2459,6 @@
        Source 2: Live Microphone
        -------------------------------------------------------------------------- */
    async function toggleMicrophone() {
-      const ctx = ensureAudioContext();
-      if (!ctx) return;
-
-      if (state.micStream || state.isVirtualMicActive) {
-        stopMicrophone();
-        return;
-      }
-
-      stopSpokenDemo();
-      stopQuickVoiceLoop();
-      stopUploadedAudio();
-
-      let stream = null;
-
-      // 1. Attempt hardware microphone capture
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        } catch (hwErr) {
-          console.warn('Physical mic access unavailable:', hwErr);
-        }
-      }
-
-      // 2. Hardware Mic succeeded
-      if (stream) {
-        try {
-          state.micStream = stream;
-          state.micSourceNode = ctx.createMediaStreamSource(stream);
-          state.micSourceNode.connect(state.inputGainNode);
-
-          setEngineStatus('active', 'Microphone Live');
-          UI.btnMic.classList.remove('btn-primary');
-          UI.btnMic.classList.add('btn-warning');
-          UI.btnMicLabel.textContent = 'Mute Microphone';
-          UI.btnRecord.disabled = false;
-
-          showNotice('Microphone connected! Click "Hear Myself" to monitor through headphones.', 'success');
-          return;
-        } catch (graphErr) {
-          console.warn('Audio graph connection error:', graphErr);
-        }
-      }
-
-      // 3. Fallback: Seamlessly engage Live Voice Stream so all 16 presets & recording work
-      showNotice('Hardware mic restricted by browser/sandbox policy. Live Voice Stream active so you can test all 16 presets & export recording!', 'info');
-      activateVirtualLiveMic(ctx);
-    }
-
-  async function toggleMicrophone() {
       const ctx = ensureAudioContext();
       if (!ctx) return;
 
