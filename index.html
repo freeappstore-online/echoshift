@@ -2492,10 +2492,24 @@
         showNotice('Microphone connected! Speak into your mic. Click "Hear Myself" to monitor live.', 'success');
       } catch (err) {
         console.warn('Physical mic access error:', err);
+        
         if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-          showNotice('No microphone detected by your browser. Please check Windows sound input settings.', 'warning');
+          const pp = document.permissionsPolicy || document.featurePolicy;
+          const blockedByPolicy = pp && typeof pp.allowsFeature === 'function' && !pp.allowsFeature('microphone');
+
+          if (blockedByPolicy) {
+            const inFrame = window.self !== window.top;
+            showNotice(
+              inFrame
+                ? 'Microphone blocked by iframe container. Open directly in a new tab: ' + location.href
+                : 'Microphone blocked by site hosting policy (Permissions-Policy header).',
+              'warning'
+            );
+          } else {
+            showNotice('No microphone detected. Please check your system sound input settings.', 'warning');
+          }
         } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          showNotice('Microphone permission blocked. Please allow mic access in your browser address bar.', 'warning');
+          showNotice('Microphone permission blocked. Please allow mic access in your browser bar.', 'warning');
         } else {
           showNotice(`Microphone error: ${err.message || err.name}`, 'warning');
         }
@@ -2538,7 +2552,7 @@
     /* --------------------------------------------------------------------------
        Source 3: Quick 3-Second Voice Test Loop
        -------------------------------------------------------------------------- */
-   async function startQuickVoiceRecord() {
+  async function startQuickVoiceRecord() {
       const ctx = ensureAudioContext();
       if (!ctx) return;
 
@@ -2546,15 +2560,19 @@
       stopQuickVoiceLoop();
       stopUploadedAudio();
 
-      let stream = state.micStream;
+      let recordStream = null;
+      let shouldStopTracks = false;
 
-      if (!stream) {
+      // Use live mic stream if already running, otherwise create a temporary one
+      if (state.micStream) {
+        recordStream = state.micStream;
+      } else {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          state.micStream = stream;
+          recordStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          shouldStopTracks = true; // Temporary stream: stop tracks when done
         } catch (e) {
           console.warn('Physical mic unavailable for quick record:', e);
-          showNotice('Microphone required for 3s quick test. Please connect an input device.', 'warning');
+          showNotice('Microphone required for 3s quick test. Please enable mic access.', 'warning');
           return;
         }
       }
@@ -2565,9 +2583,9 @@
 
       let mediaRecorder;
       try {
-        mediaRecorder = new MediaRecorder(stream, { mimeType });
+        mediaRecorder = new MediaRecorder(recordStream, { mimeType });
       } catch (e) {
-        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder = new MediaRecorder(recordStream);
       }
 
       const recordedChunks = [];
@@ -2592,6 +2610,11 @@
         UI.btnQuickRecord.disabled = false;
         UI.btnQuickRecord.textContent = 'Record 3s Test Phrase';
 
+        // Clean up temporary hardware stream so tracks do not run indefinitely
+        if (shouldStopTracks && recordStream) {
+          recordStream.getTracks().forEach(t => t.stop());
+        }
+
         if (recordedChunks.length === 0) {
           showNotice('No audio data was recorded.', 'warning');
           return;
@@ -2602,7 +2625,7 @@
           const arrayBuffer = await blob.arrayBuffer();
           const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
           state.quickLoopBuffer = audioBuffer;
-          showNotice('3s sample recorded! Now looping continuously. Click any voice preset to audition.', 'success');
+          showNotice('3s sample recorded! Now looping continuously. Click any preset to audition.', 'success');
           playQuickVoiceLoop();
         } catch (decodeErr) {
           console.error('Failed to decode recorded quick loop:', decodeErr);
