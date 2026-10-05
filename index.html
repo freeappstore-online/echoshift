@@ -903,7 +903,7 @@
         <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
       </svg>
       <div id="noticeText">
-        Welcome to EchoShift! Click <strong>"Play Spoken Demo"</strong> to audition voice effects immediately with real spoken words, or click <strong>"Enable Mic"</strong> for live microphone transformation!
+        Welcome to EchoShift! Click <strong>"Play Spoken Demo"</strong> to audition voice effects immediately, or upload any audio file below.
       </div>
     </div>
 
@@ -922,6 +922,7 @@
           <span style="font-size: 0.72rem; color: var(--text-dim);" id="sampleRateLabel">48.0 kHz</span>
         </div>
 
+      
         <!-- Source Selector Tabs -->
         <div class="source-tabs">
           <button class="source-tab-btn active" id="tabBtnSpoken" onclick="switchSourceTab('spoken')">
@@ -930,20 +931,6 @@
               <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
             </svg>
             Spoken Voice Demo
-          </button>
-          <button class="source-tab-btn" id="tabBtnMic" onclick="switchSourceTab('mic')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-            </svg>
-            Live Microphone
-          </button>
-          <button class="source-tab-btn" id="tabBtnQuickLoop" onclick="switchSourceTab('quickloop')">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-            </svg>
-            3s Quick Test Loop
           </button>
           <button class="source-tab-btn" id="tabBtnUpload" onclick="switchSourceTab('upload')">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -984,56 +971,7 @@
           </div>
         </div>
 
-        <!-- Panel 2: Live Microphone -->
-        <div class="source-panel" id="panelMic">
-          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-           <button id="btnMic" class="btn btn-primary" onclick="toggleMicrophone()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                <line x1="12" y1="19" x2="12" y2="23"/>
-              </svg>
-              <span id="btnMicLabel">Enable Microphone</span>
-            </button>
-
-            <button id="btnToggleMonitor" class="btn btn-secondary" onclick="toggleLiveMonitoring()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
-                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
-              </svg>
-              <span id="btnToggleMonitorLabel">Hear Myself: OFF</span>
-            </button>
-          </div>
-          <span style="font-size: 0.72rem; color: var(--text-dim);">
-            Tip: Wear headphones before clicking "Hear Myself" to prevent acoustic feedback screeches.
-          </span>
-        </div>
-
-        <!-- Panel 3: Quick 3-Second Test Loop -->
-        <div class="source-panel" id="panelQuickLoop">
-          <div style="font-size: 0.76rem; color: var(--text-muted);">
-            Record a quick 3-second sample of your voice ("One, two, three!"). It will automatically loop continuously so you can test all filter presets without needing headphones!
-          </div>
-         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <button id="btnQuickRecord" class="btn btn-danger" onclick="startQuickVoiceRecord()">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="12" cy="12" r="8"/>
-              </svg>
-              <span id="btnQuickRecordLabel">Record 3s Test Phrase</span>
-            </button>
-
-            <button id="btnQuickStop" class="btn btn-secondary" onclick="stopQuickVoiceLoop()" style="display: none;">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="2"/>
-              </svg>
-              <span>Stop Loop</span>
-            </button>
-          </div>
-          <div class="progress-bar-container" id="quickLoopProgress">
-            <div class="progress-bar-fill" id="quickLoopProgressFill"></div>
-          </div>
-        </div>
-
+       
         <!-- Panel 4: Upload Audio File -->
         <div class="source-panel" id="panelUpload">
           <input type="file" id="audioFileInput" accept="audio/*" style="display: none;" onchange="handleAudioFileUpload(event)">
@@ -2312,9 +2250,9 @@
     /* --------------------------------------------------------------------------
        Source Switching (Spoken Demo vs Mic vs Quick Loop vs Upload)
        -------------------------------------------------------------------------- */
-    function switchSourceTab(tabKey) {
+ function switchSourceTab(tabKey) {
       state.activeSourceTab = tabKey;
-      const tabs = ['spoken', 'mic', 'quickloop', 'upload'];
+      const tabs = ['spoken', 'upload'];
       tabs.forEach(t => {
         const btn = document.getElementById('tabBtn' + capitalize(t));
         const panel = document.getElementById('panel' + capitalize(t));
@@ -2395,8 +2333,6 @@
       if (!state.demoAudioBuffer) return;
 
       // Stop any other active sources
-      stopMicrophone();
-      stopQuickVoiceLoop();
       stopUploadedAudio();
 
       // Ensure monitor volume is audible
@@ -2407,7 +2343,7 @@
       const source = ctx.createBufferSource();
       source.buffer = state.demoAudioBuffer;
       source.loop = UI.demoLoopToggle.checked;
-     source.playbackRate.value = (state.activePreset === 'chipmunk') ? 1.6 : (state.activePreset === 'deep' ? 0.9 : 1.15);
+      source.playbackRate.value = (state.activePreset === 'chipmunk') ? 1.6 : (state.activePreset === 'deep' ? 0.9 : 1.15);
       source.connect(state.inputGainNode);
 
       source.onended = () => {
@@ -2436,7 +2372,7 @@
       UI.btnPlayDemo.classList.remove('btn-warning');
       UI.btnPlayDemoLabel.textContent = 'Play Spoken Demo';
 
-      if (!state.micStream && !state.quickLoopPlaying && !state.uploadedPlaying) {
+      if (!state.uploadedPlaying) {
         setEngineStatus('idle', 'Engine Ready (Idle)');
       }
     }
@@ -2454,227 +2390,10 @@
         state.demoSourceNode.loop = UI.demoLoopToggle.checked;
       }
     });
+   
 
-    /* --------------------------------------------------------------------------
-       Source 2: Live Microphone
-       -------------------------------------------------------------------------- */
-   async function toggleMicrophone() {
-      const ctx = ensureAudioContext();
-      if (!ctx) return;
-
-      if (state.micStream) {
-        stopMicrophone();
-        return;
-      }
-
-      stopSpokenDemo();
-      stopQuickVoiceLoop();
-      stopUploadedAudio();
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showNotice('Microphone API (getUserMedia) is not supported in this browser.', 'warning');
-        return;
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        state.micStream = stream;
-        state.micSourceNode = ctx.createMediaStreamSource(stream);
-        state.micSourceNode.connect(state.inputGainNode);
-
-        setEngineStatus('active', 'Microphone Live');
-        UI.btnMic.classList.remove('btn-primary');
-        UI.btnMic.classList.add('btn-warning');
-        UI.btnMicLabel.textContent = 'Mute Microphone';
-        UI.btnRecord.disabled = false;
-
-        showNotice('Microphone connected! Speak into your mic. Click "Hear Myself" to monitor live.', 'success');
-      } catch (err) {
-        console.warn('Physical mic access error:', err);
-        
-        if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-          const pp = document.permissionsPolicy || document.featurePolicy;
-          const blockedByPolicy = pp && typeof pp.allowsFeature === 'function' && !pp.allowsFeature('microphone');
-
-          if (blockedByPolicy) {
-            const inFrame = window.self !== window.top;
-            showNotice(
-              inFrame
-                ? 'Microphone blocked by iframe container. Open directly in a new tab: ' + location.href
-                : 'Microphone blocked by site hosting policy (Permissions-Policy header).',
-              'warning'
-            );
-          } else {
-            showNotice('No microphone detected. Please check your system sound input settings.', 'warning');
-          }
-        } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          showNotice('Microphone permission blocked. Please allow mic access in your browser bar.', 'warning');
-        } else {
-          showNotice(`Microphone error: ${err.message || err.name}`, 'warning');
-        }
-      }
-    }
-
-      function stopMicrophone() {
-      if (state.micStream) {
-        state.micStream.getTracks().forEach(track => track.stop());
-        state.micStream = null;
-      }
-      if (state.micSourceNode) {
-        try { state.micSourceNode.disconnect(); } catch (e) {}
-        state.micSourceNode = null;
-      }
-
-      UI.btnMic.classList.add('btn-primary');
-      UI.btnMic.classList.remove('btn-warning');
-      UI.btnMicLabel.textContent = 'Enable Microphone';
-      setEngineStatus('idle', 'Engine Ready (Idle)');
-    }
-
-    function toggleLiveMonitoring() {
-      state.liveMonitorEnabled = !state.liveMonitorEnabled;
-      if (state.liveMonitorEnabled) {
-        UI.btnToggleMonitor.classList.remove('btn-secondary');
-        UI.btnToggleMonitor.classList.add('btn-warning');
-        UI.btnToggleMonitorLabel.textContent = 'Hear Myself: ON';
-        setVolumeQuick(50);
-        showNotice('Live speaker monitor ON! Wear headphones to prevent acoustic microphone feedback.', 'warning');
-      } else {
-        UI.btnToggleMonitor.classList.add('btn-secondary');
-        UI.btnToggleMonitor.classList.remove('btn-warning');
-        UI.btnToggleMonitorLabel.textContent = 'Hear Myself: OFF';
-        setVolumeQuick(0);
-        showNotice('Live speaker monitor muted. Visualizer and recording remain 100% active.', 'info');
-      }
-    }
-
-    /* --------------------------------------------------------------------------
-       Source 3: Quick 3-Second Voice Test Loop
-       -------------------------------------------------------------------------- */
-  async function startQuickVoiceRecord() {
-      const ctx = ensureAudioContext();
-      if (!ctx) return;
-
-      stopSpokenDemo();
-      stopQuickVoiceLoop();
-      stopUploadedAudio();
-
-      let recordStream = null;
-      let shouldStopTracks = false;
-
-      // Use live mic stream if already running, otherwise create a temporary one
-      if (state.micStream) {
-        recordStream = state.micStream;
-      } else {
-        try {
-          recordStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          shouldStopTracks = true; // Temporary stream: stop tracks when done
-        } catch (e) {
-          console.warn('Physical mic unavailable for quick record:', e);
-          showNotice('Microphone required for 3s quick test. Please enable mic access.', 'warning');
-          return;
-        }
-      }
-
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4');
-
-      let mediaRecorder;
-      try {
-        mediaRecorder = new MediaRecorder(recordStream, { mimeType });
-      } catch (e) {
-        mediaRecorder = new MediaRecorder(recordStream);
-      }
-
-      const recordedChunks = [];
-      mediaRecorder.ondataavailable = e => {
-        if (e.data && e.data.size > 0) recordedChunks.push(e.data);
-      };
-
-      let countdown = 3;
-      UI.btnQuickRecord.disabled = true;
-      UI.btnQuickRecord.textContent = `Recording... ${countdown}s`;
-
-      const countdownInterval = setInterval(() => {
-        countdown--;
-        if (countdown > 0) {
-          UI.btnQuickRecord.textContent = `Recording... ${countdown}s`;
-        } else {
-          clearInterval(countdownInterval);
-        }
-      }, 1000);
-
-      mediaRecorder.onstop = async () => {
-        UI.btnQuickRecord.disabled = false;
-        UI.btnQuickRecord.textContent = 'Record 3s Test Phrase';
-
-        // Clean up temporary hardware stream so tracks do not run indefinitely
-        if (shouldStopTracks && recordStream) {
-          recordStream.getTracks().forEach(t => t.stop());
-        }
-
-        if (recordedChunks.length === 0) {
-          showNotice('No audio data was recorded.', 'warning');
-          return;
-        }
-
-        const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-        try {
-          const arrayBuffer = await blob.arrayBuffer();
-          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-          state.quickLoopBuffer = audioBuffer;
-          showNotice('3s sample recorded! Now looping continuously. Click any preset to audition.', 'success');
-          playQuickVoiceLoop();
-        } catch (decodeErr) {
-          console.error('Failed to decode recorded quick loop:', decodeErr);
-          showNotice('Failed to process recorded audio. Please try again.', 'warning');
-        }
-      };
-
-      mediaRecorder.start();
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          mediaRecorder.stop();
-        }
-      }, 3000);
-    }
-    function playQuickVoiceLoop() {
-      const ctx = ensureAudioContext();
-      if (!ctx || !state.quickLoopBuffer) return;
-
-      stopQuickVoiceLoop();
-
-      // Unmute monitor for playback
-      setVolumeQuick(75);
-
-      const source = ctx.createBufferSource();
-      source.buffer = state.quickLoopBuffer;
-      source.loop = true;
-      source.playbackRate.value = (state.activePreset === 'chipmunk') ? 1.6 : 1.0;
-      source.connect(state.inputGainNode);
-      source.start(0);
-
-      state.quickLoopSourceNode = source;
-      state.quickLoopPlaying = true;
-      UI.btnQuickStop.style.display = 'inline-flex';
-      UI.btnRecord.disabled = false;
-      setEngineStatus('demo', 'Looping Your 3s Voice Sample');
-      showNotice('Your 3s voice sample is now looping! Click different filter presets to hear your own voice transform.', 'success');
-    }
-
-    function stopQuickVoiceLoop() {
-      if (state.quickLoopSourceNode) {
-        try { state.quickLoopSourceNode.stop(); state.quickLoopSourceNode.disconnect(); } catch (e) {}
-        state.quickLoopSourceNode = null;
-      }
-      state.quickLoopPlaying = false;
-      UI.btnQuickStop.style.display = 'none';
-    }
-
-    /* --------------------------------------------------------------------------
-       Source 4: Audio File Upload
+   /* --------------------------------------------------------------------------
+       Source 4: Audio File Upload (With Pause/Resume & Clean Track Switching)
        -------------------------------------------------------------------------- */
     function handleDragOver(e) {
       e.preventDefault();
@@ -2703,25 +2422,33 @@
       const ctx = ensureAudioContext();
       if (!ctx) return;
 
+      // 1. Immediately stop any currently playing song and reset position to 0
+      stopUploadedAudio(true);
+      stopSpokenDemo();
+
       showNotice(`Loading ${file.name}...`, 'info');
       const arrayBuf = await file.arrayBuffer();
+
       try {
         state.uploadedBuffer = await ctx.decodeAudioData(arrayBuf);
-        UI.uploadedFileName.textContent = file.name;
-        UI.uploadedFileInfo.style.display = 'flex';
-        showNotice(`File "${file.name}" loaded! Click Play to audition through voice filters.`, 'success');
-        playUploadedAudio();
       } catch (err) {
-        console.error('Failed to decode uploaded audio:', err);
+        console.error('Failed to decode audio:', err);
         showNotice('Could not decode audio file. Please try another MP3 or WAV file.', 'warning');
+        return;
       }
+
+      state.uploadedPausedAt = 0;
+      UI.uploadedFileName.textContent = file.name;
+      UI.uploadedFileInfo.style.display = 'flex';
+      showNotice(`File "${file.name}" loaded! Click Play to audition through voice filters.`, 'success');
+      playUploadedAudio();
     }
 
     function toggleUploadedAudioPlay() {
       if (state.uploadedPlaying) {
-        stopUploadedAudio();
+        stopUploadedAudio(false); // Pause: saves current timestamp
       } else {
-        playUploadedAudio();
+        playUploadedAudio();      // Resume: starts from saved timestamp
       }
     }
 
@@ -2730,38 +2457,73 @@
       if (!ctx || !state.uploadedBuffer) return;
 
       stopSpokenDemo();
-      stopMicrophone();
-      stopQuickVoiceLoop();
+
+      // Ensure any existing node is stopped so tracks never overlap
+      if (state.uploadedSourceNode) {
+        try {
+          state.uploadedSourceNode.onended = null;
+          state.uploadedSourceNode.stop();
+          state.uploadedSourceNode.disconnect();
+        } catch (e) {}
+        state.uploadedSourceNode = null;
+      }
 
       setVolumeQuick(75);
+
+      const rate = (state.activePreset === 'chipmunk') ? 1.6 : (state.activePreset === 'deep' ? 0.9 : 1.15);
+      const duration = state.uploadedBuffer.duration || 1;
+      const offset = (state.uploadedPausedAt || 0) % duration;
 
       const source = ctx.createBufferSource();
       source.buffer = state.uploadedBuffer;
       source.loop = true;
-      source.playbackRate.value = (state.activePreset === 'chipmunk') ? 1.6 : 1.0;
+      source.playbackRate.value = rate;
       source.connect(state.inputGainNode);
 
       source.onended = () => {
-        if (!source.loop) stopUploadedAudio();
+        if (!source.loop) stopUploadedAudio(true);
       };
 
-      source.start(0);
+      // Resume from the saved offset
+      source.start(0, offset);
+      state.uploadedStartedAt = ctx.currentTime;
       state.uploadedSourceNode = source;
       state.uploadedPlaying = true;
+
       UI.btnUploadedPlay.textContent = 'Pause';
       UI.btnRecord.disabled = false;
       setEngineStatus('demo', 'Playing Uploaded Audio File');
     }
 
-    function stopUploadedAudio() {
+    function stopUploadedAudio(reset = false) {
+      // Calculate elapsed playback time before destroying the node
+      if (state.uploadedPlaying && state.audioCtx && state.uploadedBuffer) {
+        const rate = state.uploadedSourceNode ? state.uploadedSourceNode.playbackRate.value : 1.0;
+        const elapsed = (state.audioCtx.currentTime - state.uploadedStartedAt) * rate;
+        const duration = state.uploadedBuffer.duration || 1;
+        state.uploadedPausedAt = ((state.uploadedPausedAt || 0) + elapsed) % duration;
+      }
+
+      if (reset) {
+        state.uploadedPausedAt = 0;
+      }
+
       if (state.uploadedSourceNode) {
-        try { state.uploadedSourceNode.stop(); state.uploadedSourceNode.disconnect(); } catch (e) {}
+        try {
+          state.uploadedSourceNode.onended = null;
+          state.uploadedSourceNode.stop();
+          state.uploadedSourceNode.disconnect();
+        } catch (e) {}
         state.uploadedSourceNode = null;
       }
-      state.uploadedPlaying = false;
-      UI.btnUploadedPlay.textContent = 'Play';
-    }
 
+      state.uploadedPlaying = false;
+      if (UI.btnUploadedPlay) UI.btnUploadedPlay.textContent = 'Play';
+
+      if (!state.demoPlaying) {
+        setEngineStatus('idle', 'Engine Ready (Idle)');
+      }
+    }
     /* --------------------------------------------------------------------------
        Volume & Monitoring Controls (Fixes "Beside original voice I can't hear")
        -------------------------------------------------------------------------- */
