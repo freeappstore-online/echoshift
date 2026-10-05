@@ -1,0 +1,15 @@
+name: Platform Compliance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compliance:
+    uses: freeappstore-online/ci-workflows/.github/workflows/app-ci.yml@main
