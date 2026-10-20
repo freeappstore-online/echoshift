@@ -1370,6 +1370,7 @@
       activeSourceTab: 'spoken',
       micStream: null,
       micSourceNode: null,
+      micRequestId: 0,
       liveMonitorEnabled: false,
 
       // Spoken Demo Audio State
@@ -2284,6 +2285,9 @@
        Source Switching (Spoken Demo vs Mic vs Quick Loop vs Upload)
        -------------------------------------------------------------------------- */
  function switchSourceTab(tabKey) {
+      if (state.activeSourceTab === 'mic' && tabKey !== 'mic') {
+        stopMicrophone();
+      }
       state.activeSourceTab = tabKey;
       const tabs = ['spoken', 'mic', 'upload'];
       tabs.forEach(t => {
@@ -2447,8 +2451,13 @@
       }
 
       UI.btnMic.disabled = true;
+      const requestId = ++state.micRequestId;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (requestId !== state.micRequestId) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
 
         // Demo/upload playback can leave the speakers unmuted.
         state.liveMonitorEnabled = false;
@@ -2468,35 +2477,35 @@
 
         showNotice('Microphone connected! Speak into your mic. Click "Hear Myself" to monitor live.', 'success');
       } catch (err) {
+        if (requestId !== state.micRequestId) return;
         stopMicrophone();
         console.warn('Physical mic access error:', err);
 
-        if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-          const pp = document.permissionsPolicy || document.featurePolicy;
-          const blockedByPolicy = pp && typeof pp.allowsFeature === 'function' && !pp.allowsFeature('microphone');
-
-          if (blockedByPolicy) {
-            const inFrame = window.self !== window.top;
-            showNotice(
-              inFrame
-                ? 'Microphone blocked by iframe container. Open directly in a new tab: ' + location.href
-                : 'Microphone blocked by site hosting policy (Permissions-Policy header).',
-              'warning'
-            );
-          } else {
-            showNotice('No microphone detected. Please check your system sound input settings.', 'warning');
-          }
+        const pp = document.permissionsPolicy || document.featurePolicy;
+        const blockedByPolicy = pp && typeof pp.allowsFeature === 'function' && !pp.allowsFeature('microphone');
+        if (blockedByPolicy) {
+          const inFrame = window.self !== window.top;
+          showNotice(
+            inFrame
+              ? 'Microphone blocked by iframe container. Open directly in a new tab: ' + location.href
+              : 'Microphone blocked by site hosting policy (Permissions-Policy header).',
+            'warning'
+          );
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          showNotice('No microphone detected. Please check your system sound input settings.', 'warning');
         } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
           showNotice('Microphone permission blocked. Please allow mic access in your browser bar.', 'warning');
         } else {
           showNotice(`Microphone error: ${err.message || err.name}`, 'warning');
         }
       } finally {
-        UI.btnMic.disabled = false;
+        if (requestId === state.micRequestId) UI.btnMic.disabled = false;
       }
     }
 
     function stopMicrophone() {
+      state.micRequestId++;
+      UI.btnMic.disabled = false;
       if (state.micStream) {
         state.micStream.getTracks().forEach(track => track.stop());
         state.micStream = null;
