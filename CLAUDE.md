@@ -10,3 +10,7 @@ In-Browser Real-Time Voice Changer & Audio Visualizer with live effects, recordi
 Free, MIT-licensed, no tracking. For platform conventions, read SKILLS.md:
 https://raw.githubusercontent.com/freeappstore-online/freeappstore/main/SKILLS.md
 (or https://freeappstore.online/skills.md) before writing or changing anything.
+
+## Delivery mode
+
+**Straight to `main`. No branches, no pull requests.** Declared 2026-08-16.
