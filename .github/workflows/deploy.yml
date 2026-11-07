@@ -43,12 +43,10 @@ jobs:
               status=$?
               cat "$log"
               if grep -q 'ERR_PNPM_OUTDATED_LOCKFILE' "$log"; then
-                echo "Dependency manifests changed; updating the app lock deliberately."
-                pnpm install --no-frozen-lockfile
-              else
-                rm "$log"
-                exit "$status"
+                echo "::error::pnpm-lock.yaml does not match package.json. Run pnpm install locally and commit the updated lock; deploys never rewrite it."
               fi
+              rm "$log"
+              exit "$status"
             fi
             rm "$log"
           fi
@@ -141,8 +139,14 @@ jobs:
           cd site
           test -n "$(ls -A .)" || { echo "::error::build artifact is empty"; exit 1; }
           find . -type f -printf '%P\t%s\n' \
-            | jq -Rn '{files: [inputs | split("\t") | {key: .[0], value: (.[1] | tonumber)}] | from_entries}' \
-            > "$RUNNER_TEMP/manifest.json"
+            | jq -Rn '[inputs | split("\t") | {key: .[0], value: (.[1] | tonumber)}] | from_entries' \
+            > "$RUNNER_TEMP/sizes.json"
+          # Content hashes let the API skip files unchanged since the live release.
+          find . -type f -print0 | xargs -0 sha256sum \
+            | jq -Rn '[inputs | capture("^(?<h>[0-9a-f]{64})  \\./(?<p>.*)$")] | map({key: .p, value: .h}) | from_entries' \
+            > "$RUNNER_TEMP/hashes.json"
+          jq -n --slurpfile f "$RUNNER_TEMP/sizes.json" --slurpfile h "$RUNNER_TEMP/hashes.json" \
+            '{files: $f[0], hashes: $h[0]}' > "$RUNNER_TEMP/manifest.json"
           oidc=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$DEPLOY_API" | jq -r .value)
           echo "::add-mask::$oidc"
@@ -150,9 +154,10 @@ jobs:
             -H "Authorization: Bearer $oidc" -H 'Content-Type: application/json' \
             --data-binary @"$RUNNER_TEMP/manifest.json") \
             || { echo "::error::deploy refused: $session"; exit 1; }
-          DEPLOY_TOKEN=$(jq -r .token <<<"$session")
+          printf '%s' "$session" > "$RUNNER_TEMP/session.json"
+          DEPLOY_TOKEN=$(jq -r .token "$RUNNER_TEMP/session.json")
           echo "::add-mask::$DEPLOY_TOKEN"
-          DEPLOY_URL="$DEPLOY_API/v1/deploys/$(jq -r .id <<<"$session")"
+          DEPLOY_URL="$DEPLOY_API/v1/deploys/$(jq -r .id "$RUNNER_TEMP/session.json")"
           export DEPLOY_TOKEN DEPLOY_URL
           upload() {
             curl -sS --fail-with-body --retry 3 --retry-all-errors -T "./$1" \
@@ -160,7 +165,21 @@ jobs:
               "$DEPLOY_URL/files/$(jq -rn --arg p "$1" '$p | split("/") | map(@uri) | join("/")')"
           }
           export -f upload
-          find . -type f -printf '%P\0' | xargs -0 -P 8 -n 1 bash -c 'upload "$1"' _
+          if jq -e 'has("missing")' "$RUNNER_TEMP/session.json" > /dev/null; then
+            # Delta: upload only what changed; the API copies the rest from the live release.
+            echo "Delta deploy: $(jq '.missing | length' "$RUNNER_TEMP/session.json") to upload, $(jq '.reuse | length' "$RUNNER_TEMP/session.json") reused from the live release"
+            jq -r '.missing[]' "$RUNNER_TEMP/session.json" | tr '\n' '\0' | xargs -0 -P 8 -n 1 bash -c 'upload "$1"' _
+            reuse_batch() {
+              curl -sS --fail-with-body --retry 3 --retry-all-errors -X POST \
+                -H "Authorization: Bearer $DEPLOY_TOKEN" -H 'Content-Type: application/json' \
+                --data-binary "$1" "$DEPLOY_URL/reuse" -w "reuse batch: HTTP %{http_code} in %{time_total}s\n"
+            }
+            export -f reuse_batch
+            jq -c '.reuse as $r | if ($r | length) == 0 then empty else ($r | _nwise(100) | {paths: .}) end' \
+              "$RUNNER_TEMP/session.json" | tr '\n' '\0' | xargs -0 -P 8 -n 1 bash -c 'reuse_batch "$1"' _
+          else
+            find . -type f -printf '%P\0' | xargs -0 -P 8 -n 1 bash -c 'upload "$1"' _
+          fi
           curl -sS --fail-with-body -X POST -H "Authorization: Bearer $DEPLOY_TOKEN" "$DEPLOY_URL/commit"
           echo
           echo "Deployed ${GITHUB_REPOSITORY##*/} from ${GITHUB_SHA::7}"
