@@ -1,0 +1,6 @@
+{
+  "appId": "echoshift",
+  "applicationRoot": ".",
+  "outputPath": "web/dist",
+  "buildCommand": "pnpm build"
+}
