@@ -19,7 +19,7 @@ concurrency:
 jobs:
   deploy:
     if: ${{ !startsWith(github.event.repository.name, 'template-') }}
-    uses: freeappstore-online/platform/.github/workflows/app-deploy.yml@3a675c6a83ed50ac0ea87d25680efa4a6a8e8533
+    uses: freeappstore-online/platform/.github/workflows/app-deploy.yml@3079e4813dd86c521a3664fa93505a7bf571c64e
     permissions:
       contents: write
       id-token: write
